@@ -65,6 +65,19 @@ const PATTERNS = [
   { title: '4  FLOYD-STEINBERG', render: renderFloydSteinberg },
 ];
 
+// Common 16:9 HiDPI desktop widths exposed for a 3840x2160 panel. The scale
+// is the 2x HiDPI framebuffer width divided by the panel's native width.
+// BetterDisplay typically uses the half-native mode as 100% and clamps a 4K
+// HiDPI display at the native logical width (200%).
+const CALIBRATION_STOPS = [
+  { scale: 1, mode: '1920X1080' },
+  { scale: 2304 / 1920, mode: '2304X1296' },
+  { scale: 2560 / 1920, mode: '2560X1440' },
+  { scale: 3008 / 1920, mode: '3008X1692' },
+  { scale: 3360 / 1920, mode: '3360X1890' },
+  { scale: 2, mode: '3840X2160' },
+];
+
 let canvas;
 let imageData;
 let buffer;
@@ -76,6 +89,7 @@ let selectedPattern = -1;
 let inverted = false;
 let panelRects = [];
 let calibrationScale = 1;
+let calibrationStopIndex = 0;
 let calibrationRedrawPending = false;
 
 function setup() {
@@ -316,34 +330,44 @@ function createCalibrationControls() {
 
   const label = document.createElement('label');
   label.htmlFor = 'calibration-scale';
-  label.innerHTML = 'Move until the 1px lines are pixel-perfect <output id="calibration-value">1.000×</output>';
+  label.innerHTML = `Move until the 1px lines are pixel-perfect <output id="calibration-value">${calibrationStopLabel(0)}</output>`;
 
   const slider = document.createElement('input');
   slider.id = 'calibration-scale';
   slider.type = 'range';
-  slider.min = '0.5';
-  slider.max = '2';
-  slider.step = '0.001';
-  slider.value = String(calibrationScale);
+  slider.min = '0';
+  slider.max = String(CALIBRATION_STOPS.length - 1);
+  slider.step = '1';
+  slider.value = String(calibrationStopIndex);
   slider.setAttribute('aria-describedby', 'calibration-help');
+
+  const stopLabels = document.createElement('div');
+  stopLabels.id = 'calibration-stops';
+  for (const stop of CALIBRATION_STOPS) {
+    const tick = document.createElement('span');
+    tick.textContent = formatCompactScale(stop.scale);
+    stopLabels.append(tick);
+  }
 
   const help = document.createElement('small');
   help.id = 'calibration-help';
-  help.textContent = 'Left: vertical · Right: horizontal · Double-click to reset';
+  help.textContent = 'Common 4K HiDPI modes · Left: vertical · Right: horizontal';
 
   slider.addEventListener('input', () => {
-    calibrationScale = Number(slider.value);
-    label.querySelector('output').textContent = `${formatScale(calibrationScale)}×`;
+    calibrationStopIndex = Number(slider.value);
+    calibrationScale = CALIBRATION_STOPS[calibrationStopIndex].scale;
+    label.querySelector('output').textContent = calibrationStopLabel(calibrationStopIndex);
     scheduleCalibrationRedraw();
   });
   slider.addEventListener('dblclick', () => {
+    calibrationStopIndex = 0;
     calibrationScale = 1;
-    slider.value = '1';
-    label.querySelector('output').textContent = '1.000×';
+    slider.value = '0';
+    label.querySelector('output').textContent = calibrationStopLabel(0);
     scheduleCalibrationRedraw();
   });
 
-  controls.append(label, slider, help);
+  controls.append(label, slider, stopLabels, help);
   document.body.append(controls);
 }
 
@@ -489,4 +513,13 @@ function formatDpr(value) {
 
 function formatScale(value) {
   return value.toFixed(3);
+}
+
+function formatCompactScale(value) {
+  return value.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+function calibrationStopLabel(index) {
+  const stop = CALIBRATION_STOPS[index];
+  return `${formatScale(stop.scale)}× · ${stop.mode}`;
 }

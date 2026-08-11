@@ -45,8 +45,15 @@ canvas {
 
 #calibration-controls input {
     width: 100%;
-    margin: 8px 0 6px;
+    margin: 8px 0 2px;
     accent-color: #000;
+}
+
+#calibration-stops {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 7px;
+    font-size: 9px;
 }
 
 #calibration-controls small {

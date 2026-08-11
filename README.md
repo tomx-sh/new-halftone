@@ -22,10 +22,11 @@ Click a pattern (or press `1`–`4`) to fill the canvas. Press `G` or Escape to
 return to the gallery, `I` to invert black and white, and `S` to save a PNG at
 the backing-store resolution.
 
-Use the calibration slider to compensate for display-pipeline scaling. It
-changes the size of one conceptual renderer pixel in canvas backing pixels.
-Move it until the vertical and horizontal one-pixel stripe targets appear crisp
-and evenly spaced; double-click the slider to reset it to `1.000×`.
+Use the calibration slider to compensate for display-pipeline scaling. It uses
+discrete stops corresponding to common 4K macOS HiDPI modes, from `1920×1080`
+at `1.000×` through `3840×2160` at `2.000×`. Move it until the vertical and
+horizontal one-pixel stripe targets appear crisp and evenly spaced;
+double-click the slider to reset it to `1.000×`.
 
 ## Running Locally
 
