@@ -29,6 +29,13 @@ discrete stops corresponding to common 4K macOS HiDPI modes, starting with
 ratio. Move the slider until the vertical and horizontal one-pixel stripe
 targets appear crisp and evenly spaced; double-click it to reset to `1.000×`.
 
+## Fixed 2× version
+
+Open `x2.html` for the simplified renderer. It has no calibration controls or
+runtime scaling: every conceptual artwork pixel is always written as an
+explicit 2×2 block in the HiDPI canvas backing store. Its labels and controls
+use regular HTML, while the canvas remains strictly binary black and white.
+
 ## Running Locally
 
 For projects with media files, use a local server:

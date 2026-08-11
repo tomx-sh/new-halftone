@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="only light">
+    <title>Device Pixel Halftone Lab — Fixed 2×</title>
+    <link rel="stylesheet" href="css/x2.css">
+    <script src="js/p5.js"></script>
+</head>
+<body>
+    <header id="app-header">
+        <div>
+            <h1>Device Pixel Halftone Lab <span>Fixed 2×</span></h1>
+            <p id="display-metrics">Detecting display…</p>
+        </div>
+        <nav aria-label="Pattern selection">
+            <button type="button" data-pattern="0">1 Checker</button>
+            <button type="button" data-pattern="1">2 Bayer</button>
+            <button type="button" data-pattern="2">3 Lines</button>
+            <button type="button" data-pattern="3">4 Floyd–Steinberg</button>
+            <button type="button" data-gallery>Gallery</button>
+        </nav>
+        <p id="view-status">Gallery · Click a panel · I invert · S save</p>
+    </header>
+    <main id="canvas-host" aria-label="Fixed 2× black and white halftone renderer"></main>
+    <script src="x2-sketch.js"></script>
+</body>
+</html>
