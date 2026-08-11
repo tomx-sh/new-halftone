@@ -75,6 +75,8 @@ let dprQuery;
 let selectedPattern = -1;
 let inverted = false;
 let panelRects = [];
+let calibrationScale = 1;
+let calibrationRedrawPending = false;
 
 function setup() {
   reportedDpr = readDevicePixelRatio();
@@ -84,6 +86,7 @@ function setup() {
   canvas.elt.style.imageRendering = 'pixelated';
   noSmooth();
   noLoop();
+  createCalibrationControls();
   watchDevicePixelRatio();
 }
 
@@ -106,7 +109,7 @@ function renderGallery() {
   const scale = Math.max(1, Math.round(reportedDpr));
   const margin = 8 * scale;
   const gap = 5 * scale;
-  const headerHeight = 55 * scale;
+  const headerHeight = 82 * scale;
   const columns = windowWidth >= 680 ? 2 : 1;
   const rows = Math.ceil(PATTERNS.length / columns);
   const panelWidth = Math.floor((bufferWidth - margin * 2 - gap * (columns - 1)) / columns);
@@ -116,6 +119,8 @@ function renderGallery() {
   const metrics = `DPR ${formatDpr(reportedDpr)}  CSS ${windowWidth}X${windowHeight}  BUFFER ${bufferWidth}X${bufferHeight}`;
   drawText(metrics, margin, 20 * scale, scale, 0);
   drawText('1 SAMPLE = 1 CANVAS BACKING PIXEL  /  CLICK A PANEL  /  I INVERTS', margin, 33 * scale, scale, 0);
+  drawText(`CALIBRATION ${formatScale(calibrationScale)}X  /  VERTICAL AND HORIZONTAL 1PX STRIPES`, margin, 46 * scale, scale, 0);
+  renderCalibrationStrip(margin, 58 * scale, calibrationTargetWidth(margin), 16 * scale);
   drawHorizontalLine(0, headerHeight - 1, bufferWidth, 0);
 
   panelRects = [];
@@ -141,8 +146,10 @@ function renderPanel(index, x, y, w, h, scale) {
 
 function renderSolo(index) {
   const scale = Math.max(1, Math.round(reportedDpr));
-  const headerHeight = 27 * scale;
+  const headerHeight = 54 * scale;
   drawText(`${PATTERNS[index].title}  /  ESC GALLERY  /  I INVERTS`, 7 * scale, 8 * scale, scale, 0);
+  drawText(`CALIBRATION ${formatScale(calibrationScale)}X  /  1PX VERTICAL AND HORIZONTAL STRIPES`, 7 * scale, 21 * scale, scale, 0);
+  renderCalibrationStrip(7 * scale, 33 * scale, calibrationTargetWidth(7 * scale), 14 * scale);
   drawHorizontalLine(0, headerHeight - 1, bufferWidth, 0);
   PATTERNS[index].render(0, headerHeight, bufferWidth, bufferHeight - headerHeight);
   panelRects = [];
@@ -152,7 +159,9 @@ function renderSolo(index) {
 function renderChecker(x, y, w, h) {
   for (let py = y; py < y + h; py += 1) {
     for (let px = x; px < x + w; px += 1) {
-      setMono(px, py, ((px - x) + (py - y)) % 2 === 0);
+      const sampleX = calibratedCoordinate(px - x);
+      const sampleY = calibratedCoordinate(py - y);
+      setMono(px, py, (sampleX + sampleY) % 2 === 0);
     }
   }
 }
@@ -161,7 +170,9 @@ function renderBayer(x, y, w, h) {
   for (let py = y; py < y + h; py += 1) {
     for (let px = x; px < x + w; px += 1) {
       const darkness = w <= 1 ? 0.5 : (px - x) / (w - 1);
-      const threshold = (BAYER_8[((py - y) & 7) * 8 + ((px - x) & 7)] + 0.5) / 64;
+      const sampleX = calibratedCoordinate(px - x);
+      const sampleY = calibratedCoordinate(py - y);
+      const threshold = (BAYER_8[(sampleY & 7) * 8 + (sampleX & 7)] + 0.5) / 64;
       setMono(px, py, darkness > threshold);
     }
   }
@@ -203,8 +214,8 @@ function renderLines(x, y, w, h) {
 
       for (let py = patternY; py < patternY + patternHeight; py += 1) {
         for (let px = cellX; px < cellX + cellWidth; px += 1) {
-          const localX = px - cellX;
-          const localY = py - patternY;
+          const localX = calibratedCoordinate(px - cellX);
+          const localY = calibratedCoordinate(py - patternY);
           const onLine = isOnOnePixelLine(study.direction, localX, localY, period);
           const onDot = !dotted || isOnDot(study.direction, localX, localY, period);
           setMono(px, py, onLine && onDot);
@@ -244,29 +255,105 @@ function isOnDot(direction, x, y, period) {
 }
 
 function renderFloydSteinberg(x, y, w, h) {
-  let currentError = new Float32Array(w + 2);
-  let nextError = new Float32Array(w + 2);
+  const logicalWidth = Math.max(1, Math.ceil(w / calibrationScale));
+  const logicalHeight = Math.max(1, Math.ceil(h / calibrationScale));
+  const outputPixels = new Uint8Array(logicalWidth * logicalHeight);
+  let currentError = new Float32Array(logicalWidth + 2);
+  let nextError = new Float32Array(logicalWidth + 2);
 
-  for (let row = 0; row < h; row += 1) {
-    const py = y + row;
-    for (let column = 0; column < w; column += 1) {
-      const px = x + column;
-      const nx = w <= 1 ? 0 : column / (w - 1);
-      const ny = h <= 1 ? 0 : row / (h - 1);
+  for (let row = 0; row < logicalHeight; row += 1) {
+    for (let column = 0; column < logicalWidth; column += 1) {
+      const nx = logicalWidth <= 1 ? 0 : column / (logicalWidth - 1);
+      const ny = logicalHeight <= 1 ? 0 : row / (logicalHeight - 1);
       const wave = 0.14 * Math.sin(nx * Math.PI * 8) * Math.sin(ny * Math.PI * 3);
       const source = clampValue(nx + wave, 0, 1);
       const value = clampValue(source + currentError[column + 1], 0, 1);
       const output = value >= 0.5 ? 1 : 0;
       const error = value - output;
-      setMono(px, py, output === 1);
+      outputPixels[row * logicalWidth + column] = output;
       currentError[column + 2] += error * (7 / 16);
       nextError[column] += error * (3 / 16);
       nextError[column + 1] += error * (5 / 16);
       nextError[column + 2] += error * (1 / 16);
     }
     currentError = nextError;
-    nextError = new Float32Array(w + 2);
+    nextError = new Float32Array(logicalWidth + 2);
   }
+
+  for (let py = 0; py < h; py += 1) {
+    const sampleY = Math.min(logicalHeight - 1, calibratedCoordinate(py));
+    for (let px = 0; px < w; px += 1) {
+      const sampleX = Math.min(logicalWidth - 1, calibratedCoordinate(px));
+      setMono(x + px, y + py, outputPixels[sampleY * logicalWidth + sampleX] === 1);
+    }
+  }
+}
+
+function renderCalibrationStrip(x, y, w, h) {
+  const half = Math.floor(w / 2);
+  for (let py = y + 1; py < y + h - 1; py += 1) {
+    for (let px = x + 1; px < x + w - 1; px += 1) {
+      const isVerticalTarget = px < x + half;
+      const coordinate = isVerticalTarget ? px - x - 1 : py - y - 1;
+      setMono(px, py, calibratedCoordinate(coordinate) % 2 === 0);
+    }
+  }
+  drawRectOutline(x, y, w, h, 0);
+  drawVerticalLine(x + half, y, h, 0);
+}
+
+function calibrationTargetWidth(x) {
+  const scale = Math.max(1, Math.round(reportedDpr));
+  const controlsWidthCss = Math.min(390, windowWidth - 20) + 20;
+  const unobscuredRight = bufferWidth - Math.ceil(controlsWidthCss * reportedDpr);
+  return Math.max(80 * scale, unobscuredRight - x);
+}
+
+function createCalibrationControls() {
+  const controls = document.createElement('section');
+  controls.id = 'calibration-controls';
+  controls.setAttribute('aria-label', 'Physical pixel calibration');
+
+  const label = document.createElement('label');
+  label.htmlFor = 'calibration-scale';
+  label.innerHTML = 'Move until the 1px lines are pixel-perfect <output id="calibration-value">1.000×</output>';
+
+  const slider = document.createElement('input');
+  slider.id = 'calibration-scale';
+  slider.type = 'range';
+  slider.min = '0.5';
+  slider.max = '2';
+  slider.step = '0.001';
+  slider.value = String(calibrationScale);
+  slider.setAttribute('aria-describedby', 'calibration-help');
+
+  const help = document.createElement('small');
+  help.id = 'calibration-help';
+  help.textContent = 'Left: vertical · Right: horizontal · Double-click to reset';
+
+  slider.addEventListener('input', () => {
+    calibrationScale = Number(slider.value);
+    label.querySelector('output').textContent = `${formatScale(calibrationScale)}×`;
+    scheduleCalibrationRedraw();
+  });
+  slider.addEventListener('dblclick', () => {
+    calibrationScale = 1;
+    slider.value = '1';
+    label.querySelector('output').textContent = '1.000×';
+    scheduleCalibrationRedraw();
+  });
+
+  controls.append(label, slider, help);
+  document.body.append(controls);
+}
+
+function scheduleCalibrationRedraw() {
+  if (calibrationRedrawPending) return;
+  calibrationRedrawPending = true;
+  requestAnimationFrame(() => {
+    calibrationRedrawPending = false;
+    redraw();
+  });
 }
 
 function mousePressed() {
@@ -388,10 +475,18 @@ function positiveModulo(value, modulus) {
   return ((value % modulus) + modulus) % modulus;
 }
 
+function calibratedCoordinate(backingCoordinate) {
+  return Math.floor(backingCoordinate / calibrationScale);
+}
+
 function clampValue(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
 function formatDpr(value) {
   return value.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+function formatScale(value) {
+  return value.toFixed(3);
 }
