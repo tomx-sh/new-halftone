@@ -23,10 +23,11 @@ return to the gallery, `I` to invert black and white, and `S` to save a PNG at
 the backing-store resolution.
 
 Use the calibration slider to compensate for display-pipeline scaling. It uses
-discrete stops corresponding to common 4K macOS HiDPI modes, from `1920×1080`
-at `1.000×` through `3840×2160` at `2.000×`. Move it until the vertical and
-horizontal one-pixel stripe targets appear crisp and evenly spaced;
-double-click the slider to reset it to `1.000×`.
+discrete stops corresponding to common 4K macOS HiDPI modes, starting with
+`1504×846` at `0.783×`, followed by the doubled version of every ratio up to
+`4.000×`. The `1.567×` stop is both `3008×1692` and the doubled `1504×846`
+ratio. Move the slider until the vertical and horizontal one-pixel stripe
+targets appear crisp and evenly spaced; double-click it to reset to `1.000×`.
 
 ## Running Locally
 

@@ -70,13 +70,21 @@ const PATTERNS = [
 // BetterDisplay typically uses the half-native mode as 100% and clamps a 4K
 // HiDPI display at the native logical width (200%).
 const CALIBRATION_STOPS = [
+  { scale: 1504 / 1920, mode: '1504X846' },
   { scale: 1, mode: '1920X1080' },
   { scale: 2304 / 1920, mode: '2304X1296' },
   { scale: 2560 / 1920, mode: '2560X1440' },
-  { scale: 3008 / 1920, mode: '3008X1692' },
+  { scale: 3008 / 1920, mode: '3008X1692 / 2X 1504X846' },
   { scale: 3360 / 1920, mode: '3360X1890' },
   { scale: 2, mode: '3840X2160' },
+  { scale: (2304 / 1920) * 2, mode: '2X 2304X1296' },
+  { scale: (2560 / 1920) * 2, mode: '2X 2560X1440' },
+  { scale: (3008 / 1920) * 2, mode: '2X 3008X1692' },
+  { scale: (3360 / 1920) * 2, mode: '2X 3360X1890' },
+  { scale: 4, mode: '2X 3840X2160' },
 ];
+
+const DEFAULT_CALIBRATION_STOP_INDEX = 1;
 
 let canvas;
 let imageData;
@@ -89,7 +97,7 @@ let selectedPattern = -1;
 let inverted = false;
 let panelRects = [];
 let calibrationScale = 1;
-let calibrationStopIndex = 0;
+let calibrationStopIndex = DEFAULT_CALIBRATION_STOP_INDEX;
 let calibrationRedrawPending = false;
 
 function setup() {
@@ -330,7 +338,7 @@ function createCalibrationControls() {
 
   const label = document.createElement('label');
   label.htmlFor = 'calibration-scale';
-  label.innerHTML = `Move until the 1px lines are pixel-perfect <output id="calibration-value">${calibrationStopLabel(0)}</output>`;
+  label.innerHTML = `Move until the 1px lines are pixel-perfect <output id="calibration-value">${calibrationStopLabel(calibrationStopIndex)}</output>`;
 
   const slider = document.createElement('input');
   slider.id = 'calibration-scale';
@@ -360,10 +368,10 @@ function createCalibrationControls() {
     scheduleCalibrationRedraw();
   });
   slider.addEventListener('dblclick', () => {
-    calibrationStopIndex = 0;
+    calibrationStopIndex = DEFAULT_CALIBRATION_STOP_INDEX;
     calibrationScale = 1;
-    slider.value = '0';
-    label.querySelector('output').textContent = calibrationStopLabel(0);
+    slider.value = String(DEFAULT_CALIBRATION_STOP_INDEX);
+    label.querySelector('output').textContent = calibrationStopLabel(DEFAULT_CALIBRATION_STOP_INDEX);
     scheduleCalibrationRedraw();
   });
 
